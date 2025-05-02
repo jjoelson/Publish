@@ -10,7 +10,8 @@ import CollectionConcurrencyKit
 internal struct MarkdownFileHandler<Site: Website> {
     func addMarkdownFiles(
         in folder: Folder,
-        to context: inout PublishingContext<Site>
+        to context: inout PublishingContext<Site>,
+        customContentParser: ((String) -> String)?
     ) async throws {
         let factory = context.makeMarkdownContentFactory()
 
@@ -55,7 +56,8 @@ internal struct MarkdownFileHandler<Site: Website> {
                     return try factory.makeItem(
                         fromFile: file,
                         at: path,
-                        sectionID: sectionID
+                        sectionID: sectionID,
+                        customContentParser: customContentParser
                     )
                 } catch {
                     let path = Path(file.path(relativeTo: folder))

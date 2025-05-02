@@ -16,19 +16,25 @@ internal struct MarkdownContentFactory<Site: Website> {
     func makeContent(fromFile file: File) throws -> Content {
         let markdown = try parser.parse(file.readAsString())
         let decoder = makeMetadataDecoder(for: markdown)
-        return try makeContent(fromMarkdown: markdown, file: file, decoder: decoder)
+        return try makeContent(fromMarkdown: markdown, file: file, decoder: decoder, bodyOverride: nil)
     }
 
     func makeItem(fromFile file: File,
                   at path: Path,
-                  sectionID: Site.SectionID) throws -> Item<Site> {
-        let markdown = try parser.parse(file.readAsString())
+                  sectionID: Site.SectionID,
+                  customContentParser: ((String) -> String)?) throws -> Item<Site> {
+        let text = try file.readAsString()
+        let markdown = parser.parse(text)
         let decoder = makeMetadataDecoder(for: markdown)
 
         let metadata = try Site.ItemMetadata(from: decoder)
         let path = try decoder.decodeIfPresent("path", as: Path.self) ?? path
         let tags = try decoder.decodeIfPresent("tags", as: [Tag].self)
-        let content = try makeContent(fromMarkdown: markdown, file: file, decoder: decoder)
+        let content: Content = try makeContent(
+            fromMarkdown: markdown,
+            file: file,
+            decoder: decoder,
+            bodyOverride: customContentParser?(text))
         let rssProperties = try decoder.decodeIfPresent("rss", as: ItemRSSProperties.self)
 
         return Item(
@@ -44,7 +50,7 @@ internal struct MarkdownContentFactory<Site: Website> {
     func makePage(fromFile file: File, at path: Path) throws -> Page {
         let markdown = try parser.parse(file.readAsString())
         let decoder = makeMetadataDecoder(for: markdown)
-        let content = try makeContent(fromMarkdown: markdown, file: file, decoder: decoder)
+        let content = try makeContent(fromMarkdown: markdown, file: file, decoder: decoder, bodyOverride: nil)
         return Page(path: path, content: content)
     }
 }
@@ -59,7 +65,8 @@ private extension MarkdownContentFactory {
 
     func makeContent(fromMarkdown markdown: Ink.Markdown,
                      file: File,
-                     decoder: MarkdownMetadataDecoder) throws -> Content {
+                     decoder: MarkdownMetadataDecoder,
+                     bodyOverride: String?) throws -> Content {
         let title = try decoder.decodeIfPresent("title", as: String.self)
         let description = try decoder.decodeIfPresent("description", as: String.self)
         let date = try resolvePublishingDate(fromFile: file, decoder: decoder)
@@ -71,7 +78,7 @@ private extension MarkdownContentFactory {
         return Content(
             title: title ?? markdown.title ?? file.nameExcludingExtension,
             description: description ?? "",
-            body: Content.Body(html: markdown.html),
+            body: Content.Body(html: bodyOverride ?? markdown.html),
             date: date,
             lastModified: lastModified,
             imagePath: imagePath,
